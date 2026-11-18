@@ -12,6 +12,8 @@ import urllib.request
 from typing import Any, Dict, List, Optional
 
 DATACASTLE_OPEN_BASE = os.environ.get("DATACASTLE_API_URL", "https://datacastle.eu").rstrip("/")
+if not (DATACASTLE_OPEN_BASE.startswith("https://") or DATACASTLE_OPEN_BASE.startswith("http://localhost") or DATACASTLE_OPEN_BASE.startswith("http://127.0.0.1")):
+    DATACASTLE_OPEN_BASE = "https://datacastle.eu"
 
 TARIC_CHAPTER_GROUPS = [
     (1, 5, "Section I: Live Animals & Animal Products"),

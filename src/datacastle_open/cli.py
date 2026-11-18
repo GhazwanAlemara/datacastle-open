@@ -134,30 +134,46 @@ def _serve_local(port: int) -> int:
 
         def do_POST(self) -> None:
             try:
-                length = int(self.headers.get("Content-Length", "0"))
+                raw_len = self.headers.get("Content-Length", "0")
+                length = int(raw_len)
+                if length < 0 or length > 1_048_576:
+                    self._send(413, b'{"error":"Request payload must be 0 to 1MB"}', "application/json")
+                    return
                 payload = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+                if not isinstance(payload, dict):
+                    self._send(400, b'{"error":"JSON object payload required"}', "application/json")
+                    return
             except Exception as exc:
                 self._send(400, json.dumps({"error": str(exc)}).encode("utf-8"), "application/json")
                 return
 
-            if self.path == "/api/reconcile":
-                result = reconcile_3way_freight(
-                    payload.get("invoice_items", []),
-                    payload.get("packing_items", []),
-                    currency=str(payload.get("currency") or "EUR"),
-                )
-            elif self.path == "/api/taric":
-                result = validate_taric_code(
-                    str(payload.get("tariff_code") or ""),
-                    str(payload.get("goods_description") or ""),
-                )
-            elif self.path == "/api/ai-act":
-                result = classify_eu_ai_act(
-                    str(payload.get("system_description") or ""),
-                    str(payload.get("sector") or ""),
-                )
-            else:
-                self._send(404, b'{"error":"Not found"}', "application/json")
+            try:
+                if self.path == "/api/reconcile":
+                    inv = payload.get("invoice_items", [])
+                    pack = payload.get("packing_items", [])
+                    if not isinstance(inv, list) or not isinstance(pack, list):
+                        self._send(400, b'{"error":"invoice_items and packing_items must be JSON arrays"}', "application/json")
+                        return
+                    result = reconcile_3way_freight(
+                        inv[:100],
+                        pack[:100],
+                        currency=str(payload.get("currency") or "EUR"),
+                    )
+                elif self.path == "/api/taric":
+                    result = validate_taric_code(
+                        str(payload.get("tariff_code") or ""),
+                        str(payload.get("goods_description") or ""),
+                    )
+                elif self.path == "/api/ai-act":
+                    result = classify_eu_ai_act(
+                        str(payload.get("system_description") or ""),
+                        str(payload.get("sector") or ""),
+                    )
+                else:
+                    self._send(404, b'{"error":"Not found"}', "application/json")
+                    return
+            except (TypeError, ValueError) as exc:
+                self._send(400, json.dumps({"error": f"Invalid field value: {exc}"}).encode("utf-8"), "application/json")
                 return
 
             seal = generate_tamper_evident_seal(result, api_key=_load_saved_api_key(), sync_cloud=False)
@@ -230,6 +246,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         key = args.api_key.strip()
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         CONFIG_PATH.write_text(json.dumps({"api_key": key}, indent=2), encoding="utf-8")
+        try:
+            os.chmod(CONFIG_PATH, 0o600)
+        except OSError:
+            pass
         try:
             req = urllib.request.Request(
                 f"{DATACASTLE_OPEN_BASE}/api/v1/open/status",
