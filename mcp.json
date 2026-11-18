@@ -1,0 +1,13 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schema/mcp.json",
+  "mcpServers": {
+    "datacastle": {
+      "type": "streamableHttp",
+      "url": "https://datacastle.eu/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ${DATACASTLE_API_KEY}"
+      },
+      "description": "DataCastle EU Compliance, Customs 3-Way Reconciliation, TARIC Validation & EU AI Act Classifier. Claim a free Community Key at https://datacastle.eu/open."
+    }
+  }
+}
