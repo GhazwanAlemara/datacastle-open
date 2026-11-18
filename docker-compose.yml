@@ -1,0 +1,9 @@
+services:
+  datacastle-open:
+    build: .
+    container_name: datacastle-open
+    ports:
+      - "8090:8090"
+    environment:
+      - DATACASTLE_API_KEY=${DATACASTLE_API_KEY:-}
+    restart: unless-stopped
